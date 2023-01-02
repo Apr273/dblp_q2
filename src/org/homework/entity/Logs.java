@@ -11,24 +11,26 @@ import java.util.Scanner;
 /**
  * 日志管理类
  */
-public class Logger {
+public class Logs {
     File file;
     Integer port;
 
-    public Logger(Integer port) {
+    public Logs(Integer port) {
         this.port = port;
-        System.out.println("[query]:打开的文件：" + port + ".log");
+        System.out.println("[query]:打开文件：" + port + ".log");
         file = new File(port + ".log");
         try {
             file.createNewFile();
         } catch (IOException e) {
-            System.out.println("[query]:" + file.getName() + "文件已存在！");
+            System.out.println("[query]:" + file.getName() + "文件已经存在！");
         }
 
     }
 
+    /**
+     * 将text写入到log最后一行
+     */
     public void writeInfo(String text) {
-        //将text写入到log最后一行
         try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true)))) {
             StringBuilder stringBuilder = new StringBuilder();
             long timestamp = System.currentTimeMillis();
@@ -49,7 +51,6 @@ public class Logger {
             System.out.println("[query]:开始查询文件");
             while (scanner.hasNextLine()) {
                 String line = scanner.nextLine();
-
                 if (line.contains(keyword)) {
                     result.append(line).append("\r\n");
 

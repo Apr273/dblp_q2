@@ -1,6 +1,6 @@
 package org.homework.server;
 
-import org.homework.entity.Logger;
+import org.homework.entity.Logs;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -11,8 +11,6 @@ import java.util.*;
 
 /**
  * 多线程的方式启动Query服务
- * 暂采用tcp方式通信
- * 单socket连接还是反复socket连接（线程里再开子线程）暂未定
  */
 public class Query implements Runnable {
 
@@ -24,10 +22,10 @@ public class Query implements Runnable {
 
     public void run() {
         try {
-            System.out.println("[query]:启动query服务！");
+            System.out.println("[query]:启动query服务");
 
 
-            Logger logger = new Logger(port);
+            Logs logs = new Logs(port);
             ServerSocket serverSocket = new ServerSocket(port);
             //1.建立连接等待客户端socket
             while (true) {
@@ -35,16 +33,18 @@ public class Query implements Runnable {
                 DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
                 String info = dataInputStream.readUTF();
-                String result = logger.query(info);
+                String result = logs.query(info);
                 dataOutputStream.writeUTF(result);
             }
         } catch (IOException e) {
-            System.out.println("[error]:query服务端启动失败！");
+            System.out.println("[error]:query服务启动失败！");
         }
 
     }
 
-
+    /**
+     * 查找下一个
+     */
     public static List<Integer> findNextPort(List<Integer> numbers, int count, int min, int max) {
         List<Integer> newList = new ArrayList<>();
         //将现有数加入BitSet

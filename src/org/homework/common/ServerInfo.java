@@ -1,8 +1,7 @@
 package org.homework.common;
 
 /**
- * 存储所有服务器结点（正常或者已离开的都算）
- * 存储一些需要共享的配置信息
+ * 存储所有服务器结点和需要共享的配置信息
  */
 public class ServerInfo {
 

@@ -10,20 +10,20 @@ import java.util.Scanner;
 
 import org.homework.common.ServerInfo;
 
-public class QueryClient {
+public class ClientQuery {
 
     static ServerInfo serverInfo = new ServerInfo();
 
     static ArrayList<Integer> portList = new ArrayList<>();
 
     public static void main(String[] args) throws UnknownHostException {
-        System.out.println("进入组成员日志查询系统...（输入q退出）");
+        System.out.println("进入组成员日志查询系统（输入q退出）");
         Scanner scan = new Scanner(System.in);
         String info = "";
 
         while (true) {
             System.out.println("");
-            System.out.println("请输入要查询的关键字...");
+            System.out.println("请输入要查询的关键字:");
             if (scan.hasNextLine()) {
                 info = scan.nextLine();
                 if (info.equals("q"))
@@ -59,15 +59,18 @@ public class QueryClient {
 
     }
 
+    /**
+     * 1.与introducer通信，获取现在存活的ip列表
+     * 2.向各个ip发送请求
+     */
     public static void query(String info)  {
-        //1.与introducer通信，获取现在存活的ip列表
         try {
             portList = getIpList();
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
-        //2.向各个ip发送请求
-        System.out.println("[query]:开始查询...");
+
+        System.out.println("[query]:开始查询");
         System.out.println("[query]:结果如下");
         System.out.println("==========================");
         for (Integer port : portList) {
@@ -76,34 +79,33 @@ public class QueryClient {
         }
     }
 
-    //与introducer通信获取最新的列表
+    /**
+     * 与introducer通信获取最新的列表
+     * 1.发送Ip
+     * 2.创建数据报，包含发送的数据信息
+     * 3.创建DatagramSocket对象
+     * 4.向服务器端发送数据报
+     */
     public static ArrayList<Integer> getIpList() throws UnknownHostException {
-        InetAddress address;
-        //introducer的ip地址
-        address = InetAddress.getByName(serverInfo.introducerIp);
-        //新加入节点的ip地址
+        InetAddress address;//introducer的ip地址
+        address = InetAddress.getByName(serverInfo.introducerIp); //新加入节点的ip地址
         byte[] data = "client".getBytes();//发送ip
-        // 2.创建数据报，包含发送的数据信息
+
+        //创建数据报，包含发送的数据信息
         DatagramPacket packet = new DatagramPacket(data, data.length, address, serverInfo.introducerPort);
-        try (// 3.创建DatagramSocket对象
-             DatagramSocket socket = new DatagramSocket()
+        try (
+             DatagramSocket socket = new DatagramSocket()//创建DatagramSocket对象
         ) {
-            // 4.向服务器端发送数据报
-            socket.send(packet);
-            /*
-             * 接收服务器端响应的数据
-             */
-            // 1.创建数据报，用于接收服务器端响应的数据
-            byte[] data2 = new byte[1024];
+            socket.send(packet); //  接收服务器端响应的数据
+
+            byte[] data2 = new byte[1024];//创建数据报，用于接收服务器端响应的数据
             DatagramPacket packet2 = new DatagramPacket(data2, data2.length);
-            // 2.接收服务器响应的数据
-            socket.setSoTimeout(10000);
+            socket.setSoTimeout(10000);//接收服务器响应的数据
             socket.receive(packet2);
-            // 3.读取数据
-            String reply = new String(data2, 0, packet2.getLength());
-            System.out.println("[query]:从introducer获取到最新的成员列表: \n" + reply);
-            // 4.关闭资源
-            socket.close();
+            String reply = new String(data2, 0, packet2.getLength()); //读取数据
+            System.out.println("[query]:从introducer获取最新的成员列表: \n" + reply);
+
+            socket.close();//关闭资源
 
             if (reply.length() > 0) {//reply应为新的组成员列表的内容
                 String[] newMemberList = reply.split("\n");

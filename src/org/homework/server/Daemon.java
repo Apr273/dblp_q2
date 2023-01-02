@@ -1,22 +1,21 @@
 package org.homework.server;
 
 import org.homework.common.ServerInfo;
-import org.homework.entity.Logger;
-import org.homework.entity.MemberList;
+import org.homework.entity.Logs;
+import org.homework.entity.GroupMemberList;
 
 import java.io.IOException;
 import java.net.*;
 
 /**
  * 维护组成员的线程
- * 1.探测相邻的节点是否存活
- * 2.主动离开
- * 3.显示组成员
  */
 public class Daemon {
     public boolean inGroup = false;
     public static Integer port;//服务器自身的端口
-
+    //1.探测相邻的节点是否存活
+    //2.主动离开
+    //3.显示组成员
     //将三个子线程作为Daemon的属性，便于管理
     private Thread sendBeatingThread;
 
@@ -28,23 +27,25 @@ public class Daemon {
 
     private Thread waitIntroduceThread;
 
+    //日志维护
+    Logs logs;
+
     //每个daemon维护的全局状态列表
-    MemberList memberList = new MemberList();
+    GroupMemberList groupMemberList = new GroupMemberList();
 
     //获取introducer等常量配置
     ServerInfo serverInfo = new ServerInfo();
 
-    //日志维护
-    Logger logger;
-
     //构造函数
     Daemon(Integer port) {
         Daemon.port = port;
-        logger = new Logger(port);
+        logs = new Logs(port);
         joinGroup();
     }
 
-    //人工处理是否丢包
+    /**
+     * 模拟丢包处理
+     */
     public boolean packageLost(double lossRate) {
         return !(Math.random() > lossRate);
     }
@@ -56,46 +57,44 @@ public class Daemon {
             socket.send(datagramPacket);
     }
 
+    /**
+     * 接收客户端发送的数据
+     * 1.创建服务器端DatagramSocket，指定端口
+     * 2.创建数据报，用于接收客户端发送的数据
+     * 3.接收客户端发送的数据
+     * 4.读取数据
+     */
     void sendNewMemberMessage() throws IOException {
-        /*
-         * 接收客户端发送的数据
-         */
-        // 1.创建服务器端DatagramSocket，指定端口
+        //创建服务器端DatagramSocket，指定端口
         while (!waitIntroduceThread.isInterrupted()) {
             DatagramSocket socket = new DatagramSocket();
-            // 2.创建数据报，用于接收客户端发送的数据
             byte[] data = new byte[1024];// 创建字节数组，指定接收的数据包的大小
-            DatagramPacket packet = new DatagramPacket(data, data.length);
-            // 3.接收客户端发送的数据
-            socket.receive(packet);// 此方法在接收到数据报之前会一直阻塞
-            // 4.读取数据
-            String info = new String(data, 0, packet.getLength());
+            DatagramPacket packet = new DatagramPacket(data, data.length); //创建数据报，用于接收客户端发送的数据
+            socket.receive(packet);//接收客户端发送的数据，此方法在接收到数据报之前会一直阻塞
+            String info = new String(data, 0, packet.getLength());//读取数据
             System.out.println("[new member]:新节点加入：" + info);
 
             String timestamp = info.split(" ")[0];
             String newport = info.split(" ")[1];
-            memberList.add(timestamp, Integer.parseInt(newport));
+            groupMemberList.memberAdd(timestamp, Integer.parseInt(newport));
 
-            /*
+            /**
              * 向客户端响应数据
              */
-            // 1.定义客户端的地址、端口号、数据
-            InetAddress address = packet.getAddress();
+            InetAddress address = packet.getAddress(); //定义客户端的地址、端口号、数据
             int port2 = packet.getPort();
             byte[] data2 = (port2 + "已收到新节点消息").getBytes();
-            // 2.创建数据报，包含响应的数据信息
+            //创建数据报，包含响应的数据信息
             DatagramPacket packet2 = new DatagramPacket(data2, data2.length, address, port2);
-            // 3.响应客户端
-            socket.send(packet2);
-            // 4.关闭资源
-            socket.close();
+            socket.send(packet2);//响应客户端
+
+            socket.close(); //关闭资源
         }
 
     }
 
 
-    class listentoIntroducer implements Runnable {
-
+    class listenToIntroducer implements Runnable {
         @Override
         public void run() {
             try {
@@ -108,6 +107,9 @@ public class Daemon {
         }
     }
 
+    /**
+     * 加入组成员
+     */
     public void joinGroup() {
         try {
             join();
@@ -121,7 +123,7 @@ public class Daemon {
             sendBeatingThread = new Thread(sendBeating);//检查下一个成员
             receiveBeatingThread = new Thread(new ReceiveBeating());//被上一个成员检查
             gossportingThread = new Thread(new gossporting());
-            waitIntroduceThread = new Thread(new listentoIntroducer());
+            waitIntroduceThread = new Thread(new listenToIntroducer());
 
             sendBeatingThread.start();
             receiveBeatingThread.start();
@@ -130,57 +132,51 @@ public class Daemon {
         }
     }
 
-    //与introducer通信
+    /**
+     * 与introducer通信
+     */
     private void join() throws IOException {
-        //向introducer发出加入请求
-        request(port);
+        request(port); //向introducer发出加入请求
     }
 
+    /**
+     * 向introducer发送join请求
+     */
     public void request(Integer myport) throws UnknownHostException {
 
-        /*
-         * 向introducer发送join请求
-         */
-        // 1.定义服务器的地址、端口号、数据
-        InetAddress address;
-        //introducer的port地址
-        address = InetAddress.getByName(serverInfo.introducerIp);
-        //新加入节点的port地址
-        byte[] data = myport.toString().getBytes();//发送port
-        // 2.创建数据报，包含发送的数据信息
+        InetAddress address; //定义服务器的地址、端口号、数据
+        address = InetAddress.getByName(serverInfo.introducerIp);//introducer的port地址
+        byte[] data = myport.toString().getBytes();//新加入节点的port地址//发送port
 
+        //创建数据报，包含发送的数据信息
         DatagramPacket packet = new DatagramPacket(data, data.length, address, serverInfo.introducerPort);
         while (true) {
-            try (// 3.创建DatagramSocket对象
-                 DatagramSocket socket = new DatagramSocket(port)
+            try (
+                 DatagramSocket socket = new DatagramSocket(port)//创建DatagramSocket对象
             ) {
-                // 4.向服务器端发送数据报
-                //socket.send(packet);
-                send(socket, packet, serverInfo.loss);
-                /*
+                send(socket, packet, serverInfo.loss);// 4.向服务器端发送数据报
+
+                /**
                  * 接收服务器端响应的数据
                  */
-                // 1.创建数据报，用于接收服务器端响应的数据
-                byte[] data2 = new byte[1024];
+                byte[] data2 = new byte[1024];//创建数据报，用于接收服务器端响应的数据
                 DatagramPacket packet2 = new DatagramPacket(data2, data2.length);
-                // 2.接收服务器响应的数据
-                socket.setSoTimeout(10000);
+                socket.setSoTimeout(10000);//接收服务器响应的数据
                 socket.receive(packet2);
-                // 3.读取数据
-                String reply = new String(data2, 0, packet2.getLength());
+                String reply = new String(data2, 0, packet2.getLength());//读取数据
                 System.out.println("[join]:从introducer获取到最新的成员列表: \n" + reply);
-                // 4.关闭资源
-                socket.close();
+
+                socket.close();//关闭资源
 
                 if (reply.length() > 0) {//reply应为新的组成员列表的内容
                     System.out.println("[join]:成功加入！"+myport);
-                    logger.writeInfo("join " + myport);
+                    logs.writeInfo("join " + myport);
                     String[] newMemberList = reply.split("\n");
 
                     for (String newmember : newMemberList) {
                         String newmember_timeStamp = newmember.split(" ")[0];
                         String newmember_port = newmember.split(" ")[1];
-                        memberList.add(newmember_timeStamp, Integer.parseInt(newmember_port));
+                        groupMemberList.memberAdd(newmember_timeStamp, Integer.parseInt(newmember_port));
                     }
                     return;
                 }
@@ -193,16 +189,20 @@ public class Daemon {
         }
     }
 
-    //显示组成员
+    /**
+     * 显示组成员
+     */
     public void showGroup() {
-        memberList.show();
+        groupMemberList.memberShow();
     }
 
-    //主动离开
+    /**
+     * 主动离开
+     */
     public void leave() {
         //发送gossport协议
         String info = "gossport" + " " + port + " " + "leave" + " " + port;
-        logger.writeInfo(info);
+        logs.writeInfo(info);
         InetAddress address;
         DatagramPacket packet;
         InetAddress introducerAddress;
@@ -212,7 +212,7 @@ public class Daemon {
             address = InetAddress.getByName(serverInfo.introducerIp);
             introducerAddress = InetAddress.getByName(serverInfo.introducerIp);
             byte[] data = info.getBytes();
-            // 2.创建数据报，包含发送的数据信息
+            //创建数据报，包含发送的数据信息
             packet = new DatagramPacket(data, data.length, address, serverInfo.gossipPort);
             introducerPacket = new DatagramPacket(data, data.length, introducerAddress, serverInfo.introducerListPort);
             DatagramSocket socket = new DatagramSocket();
@@ -223,7 +223,7 @@ public class Daemon {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        memberList.remove(port);
+        groupMemberList.memberRemove(port);
         sendBeatingThread.interrupt();
         receiveBeatingThread.interrupt();
         gossportingThread.interrupt();
@@ -234,12 +234,12 @@ public class Daemon {
 
     public void findLeave(Integer leaveport) {
         //要删除的点就是原来自己探测的点
-        assert leaveport.equals(memberList.findNextServer(port));
+        assert leaveport.equals(groupMemberList.findNextServer(port));
         System.out.println("[failure]:检测到" + leaveport + "故障");
         //更新本地逻辑数组
-        memberList.remove(port);
+        groupMemberList.memberRemove(port);
         //更新自己要检查的点
-        sendBeating.portToCheck = memberList.findNextServer(port);
+        sendBeating.portToCheck = groupMemberList.findNextServer(port);
         // sendBeating.portToCheck = sendBeating.serverToCheck.port;
         sendBeating.errorNum = 0;
         if (port.equals(sendBeating.portToCheck)) {
@@ -248,7 +248,7 @@ public class Daemon {
         }
         //发送gossport协议
         String info = "gossport" + " " + port + " " + "failure" + " " + leaveport;
-        logger.writeInfo(info);
+        logs.writeInfo(info);
 
         InetAddress address;
         DatagramPacket packet;
@@ -272,8 +272,9 @@ public class Daemon {
 
     }
 
-
-    //接受gossport包，并将其转发
+    /**
+     * 接受gossport包，并将其转发
+     */
     class gossporting implements Runnable {
 
         @Override
@@ -289,7 +290,7 @@ public class Daemon {
                     // 4.读取数据
                     String info = new String(data, 0, packet.getLength());
                     // System.out.println("收到gossport: "+ info);
-                    logger.writeInfo(info);
+                    logs.writeInfo(info);
                     String[] words = info.trim().split("\\s+");
 
 
@@ -304,22 +305,22 @@ public class Daemon {
                     if (words[2].equals("failure")) {
                         //这里做了特判处理，不需要改变探测拓扑了（不过这样写可拓展性不高）
                         System.out.println(word3);
-                        memberList.remove(word3);
-                        nextport = memberList.findNextServer(port);
+                        groupMemberList.memberRemove(word3);
+                        nextport = groupMemberList.findNextServer(port);
                         //打印日志（）
                     }
 
                     if (words[2].equals("leave")) {
                         //先找到原本的lastServer再改变memberList!否则会无法结束传播！
                         System.out.println(word3 + " leave");
-                        nextport = memberList.findLastServer(port);
+                        nextport = groupMemberList.findLastServer(port);
                         //判断要不要改变探测拓扑
                         if (sendBeating.portToCheck.equals(word3)) {
-                            memberList.remove(word3);
-                            sendBeating.portToCheck = memberList.findNextServer(port);
+                            groupMemberList.memberRemove(word3);
+                            sendBeating.portToCheck = groupMemberList.findNextServer(port);
                             sendBeating.errorNum = 0;
                         } else
-                            memberList.remove(word3);
+                            groupMemberList.memberRemove(word3);
 
                     }
 
@@ -344,15 +345,13 @@ public class Daemon {
     //heart-beating检测，daemon的内部类
     class SendBeating implements Runnable {
 
-        Integer portToCheck = memberList.findNextServer(port);
-
+        Integer portToCheck = groupMemberList.findNextServer(port);
 
         //发送检测信息的间隔时间 单位:毫秒
         int interval = 5000;
 
         //累积的错误次数，超过容忍度就认为结点故障了
         int errorNum = 0;
-
 
         @Override
         public void run() {
@@ -362,7 +361,6 @@ public class Daemon {
              *
              */
             //用udp访问，检测portToCheck的状态
-
 
             while (!sendBeatingThread.isInterrupted()) {
                 //check成员列表中排在自己之后的节点状态
@@ -374,8 +372,7 @@ public class Daemon {
                     return;
                 }
 
-                portToCheck = memberList.findNextServer(port);
-
+                portToCheck = groupMemberList.findNextServer(port);
 
                 //System.out.println("向"+portToCheck+"发送heartbeating.");
                 if (errorNum >= serverInfo.tolerate) {

@@ -4,9 +4,8 @@ import java.util.ArrayList;
 
 /**
  * 组成员列表实体类
- * 
  */
-public class MemberList {
+public class GroupMemberList {
     public static ArrayList<MemberInfo> members=new ArrayList<>();
 
     public class MemberInfo{
@@ -18,14 +17,18 @@ public class MemberList {
         }
     }
 
-    //显示组成员列表
-    public void show(){
+    /**
+     * 显示组成员列表
+     */
+    public void memberShow(){
         for (MemberInfo member : members) {
             System.out.println(member.timestamp + " " + member.port);
         }
     }
-    
-    //返回字符串形式的组成员列表
+
+    /**
+     * 返回字符串形式的组成员列表
+     */
     public String members_toString(){
         StringBuilder sb = new StringBuilder();
         for (MemberInfo member:members){
@@ -34,9 +37,10 @@ public class MemberList {
         return sb.toString();
     }
 
-
-    //添加组成员
-    public void add(String timestamp,Integer port){
+    /**
+     * 添加组成员
+     */
+    public void memberAdd(String timestamp, Integer port){
         MemberInfo newmember=new MemberInfo(timestamp, port);
         for(int i=0;i<members.size();i++){
             if(members.get(i).port.equals(port)){
@@ -47,9 +51,11 @@ public class MemberList {
         members.add(newmember);
     }
 
-    //移除组成员
-    //即使port不存在也不会报错，只会什么也不做而已
-    public void remove(Integer port){
+    /**
+     * 移除组成员
+     * port不存在也不会报错，不进行任何操作
+     */
+    public void memberRemove(Integer port){
         for(int i=0;i<members.size();i++){
             if(members.get(i).port.equals(port)){
                 members.remove(i);
@@ -58,7 +64,9 @@ public class MemberList {
         }
     }
 
-    //通过port找到下一个结点，也就是要check的服务器
+    /**
+     * 通过port找到下一个结点，也就是要check的服务器
+     */
     public Integer findNextServer(Integer port){
         int flag=-1;
         for(int i=0;i<members.size();i++){
@@ -76,7 +84,9 @@ public class MemberList {
         return members.get(flag).port;
     }
 
-    //寻找上一个结点
+    /**
+     * 寻找上一个结点
+     */
     public Integer findLastServer(Integer port){
         int flag=-1;
         for(int i=0;i<members.size();i++){
