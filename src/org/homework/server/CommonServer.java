@@ -51,7 +51,7 @@ public class CommonServer {
                 if (daemon.inGroup)
                     daemon.showGroup();
                 else {
-                    System.out.println("daemon未成功加入！");
+                    System.out.println("该节点未成功加入！");
                     daemon.joinGroup();
                 }
 
@@ -62,7 +62,7 @@ public class CommonServer {
                     daemon.leave();
                     return;
                 } else {
-                    System.out.println("daemon已经不在组中！");
+                    System.out.println("该节点已经不在组中！");
                 }
                 return;
             }

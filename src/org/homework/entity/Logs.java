@@ -61,6 +61,4 @@ public class Logs {
         }
         return result.toString();
     }
-
-
 }
