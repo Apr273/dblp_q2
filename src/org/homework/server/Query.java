@@ -9,9 +9,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 
-/**
- * 多线程的方式启动Query服务
- */
 public class Query implements Runnable {
 
     Integer port;

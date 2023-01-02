@@ -8,11 +8,11 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.Scanner;
 
-import org.homework.common.ServerInfo;
+import org.homework.server.BaseInfo;
 
-public class ClientQuery {
+public class LogQuery {
 
-    static ServerInfo serverInfo = new ServerInfo();
+    static BaseInfo baseInfo = new BaseInfo();
 
     static ArrayList<Integer> portList = new ArrayList<>();
 
@@ -30,7 +30,6 @@ public class ClientQuery {
                     return;
                 query(info);
             }
-
         }
     }
 
@@ -46,7 +45,7 @@ public class ClientQuery {
         @Override
         public void run() {
             try {
-                Socket socket = new Socket(serverInfo.introducerIp, port);
+                Socket socket = new Socket(baseInfo.introducerIp, port);
                 DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
                 DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
                 dataOutputStream.writeUTF(word);
@@ -88,11 +87,11 @@ public class ClientQuery {
      */
     public static ArrayList<Integer> getIpList() throws UnknownHostException {
         InetAddress address;//introducer的ip地址
-        address = InetAddress.getByName(serverInfo.introducerIp); //新加入节点的ip地址
+        address = InetAddress.getByName(baseInfo.introducerIp); //新加入节点的ip地址
         byte[] data = "client".getBytes();//发送ip
 
         //创建数据报，包含发送的数据信息
-        DatagramPacket packet = new DatagramPacket(data, data.length, address, serverInfo.introducerPort);
+        DatagramPacket packet = new DatagramPacket(data, data.length, address, baseInfo.introducerPort);
         try (
              DatagramSocket socket = new DatagramSocket()//创建DatagramSocket对象
         ) {

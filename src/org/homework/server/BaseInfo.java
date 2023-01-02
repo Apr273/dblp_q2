@@ -1,9 +1,9 @@
-package org.homework.common;
+package org.homework.server;
 
 /**
  * 存储所有服务器结点和需要共享的配置信息
  */
-public class ServerInfo {
+public class BaseInfo {
 
     public final String introducerIp = "127.0.0.1";
 
@@ -15,7 +15,7 @@ public class ServerInfo {
 
     public final int broadcastPort = 5500;
 
-    public final int heartbeatingPort = 8765;
+    public final int heartBeatingPort = 8765;
 
 
     //todo 这个端口应该是节点端口

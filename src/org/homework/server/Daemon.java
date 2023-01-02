@@ -1,8 +1,7 @@
 package org.homework.server;
 
-import org.homework.common.ServerInfo;
 import org.homework.entity.Logs;
-import org.homework.entity.GroupMemberList;
+import org.homework.entity.MemberList;
 
 import java.io.IOException;
 import java.net.*;
@@ -23,7 +22,7 @@ public class Daemon {
 
     private Thread receiveBeatingThread;
 
-    private Thread gossportingThread;
+    private Thread gossipThread;
 
     private Thread waitIntroduceThread;
 
@@ -31,10 +30,10 @@ public class Daemon {
     Logs logs;
 
     //每个daemon维护的全局状态列表
-    GroupMemberList groupMemberList = new GroupMemberList();
+    MemberList groupMemberList = new MemberList();
 
     //获取introducer等常量配置
-    ServerInfo serverInfo = new ServerInfo();
+    BaseInfo baseInfo = new BaseInfo();
 
     //构造函数
     Daemon(Integer port) {
@@ -70,7 +69,7 @@ public class Daemon {
             DatagramSocket socket = new DatagramSocket();
             byte[] data = new byte[1024];// 创建字节数组，指定接收的数据包的大小
             DatagramPacket packet = new DatagramPacket(data, data.length); //创建数据报，用于接收客户端发送的数据
-            socket.receive(packet);//接收客户端发送的数据，此方法在接收到数据报之前会一直阻塞
+            socket.receive(packet);//接收客户端发送的数据，接收到数据报之前一直阻塞
             String info = new String(data, 0, packet.getLength());//读取数据
             System.out.println("[new member]:新节点加入：" + info);
 
@@ -122,13 +121,13 @@ public class Daemon {
             sendBeating = new SendBeating();
             sendBeatingThread = new Thread(sendBeating);//检查下一个成员
             receiveBeatingThread = new Thread(new ReceiveBeating());//被上一个成员检查
-            gossportingThread = new Thread(new gossporting());
+            gossipThread = new Thread(new gossipPort());
             waitIntroduceThread = new Thread(new listenToIntroducer());
 
             sendBeatingThread.start();
             receiveBeatingThread.start();
             waitIntroduceThread.start();
-            gossportingThread.start();
+            gossipThread.start();
         }
     }
 
@@ -145,16 +144,16 @@ public class Daemon {
     public void request(Integer myport) throws UnknownHostException {
 
         InetAddress address; //定义服务器的地址、端口号、数据
-        address = InetAddress.getByName(serverInfo.introducerIp);//introducer的port地址
+        address = InetAddress.getByName(baseInfo.introducerIp);//introducer的port地址
         byte[] data = myport.toString().getBytes();//新加入节点的port地址//发送port
 
         //创建数据报，包含发送的数据信息
-        DatagramPacket packet = new DatagramPacket(data, data.length, address, serverInfo.introducerPort);
+        DatagramPacket packet = new DatagramPacket(data, data.length, address, baseInfo.introducerPort);
         while (true) {
             try (
                  DatagramSocket socket = new DatagramSocket(port)//创建DatagramSocket对象
             ) {
-                send(socket, packet, serverInfo.loss);// 4.向服务器端发送数据报
+                send(socket, packet, baseInfo.loss);// 4.向服务器端发送数据报
 
                 /**
                  * 接收服务器端响应的数据
@@ -173,10 +172,10 @@ public class Daemon {
                     logs.writeInfo("join " + myport);
                     String[] newMemberList = reply.split("\n");
 
-                    for (String newmember : newMemberList) {
-                        String newmember_timeStamp = newmember.split(" ")[0];
-                        String newmember_port = newmember.split(" ")[1];
-                        groupMemberList.memberAdd(newmember_timeStamp, Integer.parseInt(newmember_port));
+                    for (String newMember : newMemberList) {
+                        String newMemberTimeStamp = newMember.split(" ")[0];
+                        String newMemberPort = newMember.split(" ")[1];
+                        groupMemberList.memberAdd(newMemberTimeStamp, Integer.parseInt(newMemberPort));
                     }
                     return;
                 }
@@ -200,8 +199,8 @@ public class Daemon {
      * 主动离开
      */
     public void leave() {
-        //发送gossport协议
-        String info = "gossport" + " " + port + " " + "leave" + " " + port;
+        //发送gossip协议
+        String info = "gossip" + " " + port + " " + "leave" + " " + port;
         logs.writeInfo(info);
         InetAddress address;
         DatagramPacket packet;
@@ -209,12 +208,12 @@ public class Daemon {
         DatagramPacket introducerPacket;
         try {
             //逆向传播消息
-            address = InetAddress.getByName(serverInfo.introducerIp);
-            introducerAddress = InetAddress.getByName(serverInfo.introducerIp);
+            address = InetAddress.getByName(baseInfo.introducerIp);
+            introducerAddress = InetAddress.getByName(baseInfo.introducerIp);
             byte[] data = info.getBytes();
             //创建数据报，包含发送的数据信息
-            packet = new DatagramPacket(data, data.length, address, serverInfo.gossipPort);
-            introducerPacket = new DatagramPacket(data, data.length, introducerAddress, serverInfo.introducerListPort);
+            packet = new DatagramPacket(data, data.length, address, baseInfo.gossipPort);
+            introducerPacket = new DatagramPacket(data, data.length, introducerAddress, baseInfo.introducerListPort);
             DatagramSocket socket = new DatagramSocket();
             socket.send(packet);
             socket.send(introducerPacket);
@@ -226,7 +225,7 @@ public class Daemon {
         groupMemberList.memberRemove(port);
         sendBeatingThread.interrupt();
         receiveBeatingThread.interrupt();
-        gossportingThread.interrupt();
+        gossipThread.interrupt();
         inGroup = false;
         System.out.println("[leave]:" + port + "已主动离开");
 
@@ -246,24 +245,24 @@ public class Daemon {
             System.out.println("[warning]:检测到组中现在只有一个成员！");
             // return;
         }
-        //发送gossport协议
-        String info = "gossport" + " " + port + " " + "failure" + " " + leaveport;
+        //发送gossip协议
+        String info = "gossip" + " " + port + " " + "failure" + " " + leaveport;
         logs.writeInfo(info);
 
         InetAddress address;
         DatagramPacket packet;
         DatagramPacket introducerPacket;
         try {
-            InetAddress introducerAddress = InetAddress.getByName(serverInfo.introducerIp);
-            address = InetAddress.getByName(serverInfo.introducerIp);
+            InetAddress introducerAddress = InetAddress.getByName(baseInfo.introducerIp);
+            address = InetAddress.getByName(baseInfo.introducerIp);
             byte[] data = info.getBytes();
             // 2.创建数据报，包含发送的数据信息
-            packet = new DatagramPacket(data, data.length, address, serverInfo.gossipPort);
-            introducerPacket = new DatagramPacket(data, data.length, introducerAddress, serverInfo.introducerListPort);
+            packet = new DatagramPacket(data, data.length, address, baseInfo.gossipPort);
+            introducerPacket = new DatagramPacket(data, data.length, introducerAddress, baseInfo.introducerListPort);
             DatagramSocket socket = new DatagramSocket();
             //socket.send(packet);
-            send(socket, packet, serverInfo.loss);
-            send(socket, introducerPacket, serverInfo.loss);
+            send(socket, packet, baseInfo.loss);
+            send(socket, introducerPacket, baseInfo.loss);
         } catch (UnknownHostException e) {
             return;
         } catch (IOException e) {
@@ -273,14 +272,14 @@ public class Daemon {
     }
 
     /**
-     * 接受gossport包，并将其转发
+     * 接受gossip包，并将其转发
      */
-    class gossporting implements Runnable {
+    class gossipPort implements Runnable {
 
         @Override
         public void run() {
             try (DatagramSocket socket = new DatagramSocket()) {
-                while (!gossportingThread.isInterrupted()) {
+                while (!gossipThread.isInterrupted()) {
                     // 2.创建数据报，用于接收客户端发送的数据
                     byte[] data = new byte[1024];// 创建字节数组，指定接收的数据包的大小
                     DatagramPacket packet = new DatagramPacket(data, data.length);
@@ -294,7 +293,7 @@ public class Daemon {
                     String[] words = info.trim().split("\\s+");
 
 
-                    if (words.length != 4 || !words[0].equals("gossport"))
+                    if (words.length != 4 || !words[0].equals("gossip"))
                         continue;
 
                     //下一跳的地址
@@ -324,18 +323,18 @@ public class Daemon {
 
                     }
 
-                    // 转发gossport
+                    // 转发gossip
                     if (!nextport.equals(word1)) {
-                        InetAddress address = InetAddress.getByName(serverInfo.introducerIp);
+                        InetAddress address = InetAddress.getByName(baseInfo.introducerIp);
                         // 2.创建数据报，包含响应的数据信息
-                        DatagramPacket packet2 = new DatagramPacket(data, data.length, address, serverInfo.gossipPort);
+                        DatagramPacket packet2 = new DatagramPacket(data, data.length, address, baseInfo.gossipPort);
                         // 3.响应客户端
                         //socket.send(packet2);
-                        send(socket, packet2, serverInfo.loss);
+                        send(socket, packet2, baseInfo.loss);
                     }
                 }
             } catch (IOException e) {
-                System.out.println("[error]:gossport接收错误！");
+                System.out.println("[error]:gossip接收错误！");
                 e.printStackTrace();
             }
 
@@ -375,7 +374,7 @@ public class Daemon {
                 portToCheck = groupMemberList.findNextServer(port);
 
                 //System.out.println("向"+portToCheck+"发送heartbeating.");
-                if (errorNum >= serverInfo.tolerate) {
+                if (errorNum >= baseInfo.tolerate) {
                     //重置errorNum
                     errorNum = 0;
                     findLeave(portToCheck);
@@ -385,10 +384,10 @@ public class Daemon {
                 InetAddress address;
                 DatagramPacket packet; //= new DatagramPacket(null, portToCheck);
                 try {
-                    address = InetAddress.getByName(serverInfo.introducerIp);
+                    address = InetAddress.getByName(baseInfo.introducerIp);
                     byte[] data = (portToCheck + "你还在吗？").getBytes();
                     // 2.创建数据报，包含发送的数据信息
-                    packet = new DatagramPacket(data, data.length, address, serverInfo.heartbeatingPort);
+                    packet = new DatagramPacket(data, data.length, address, baseInfo.heartBeatingPort);
 
                 } catch (UnknownHostException e) {
                     System.out.println("[error]:unKnownHost");
@@ -399,12 +398,12 @@ public class Daemon {
 
                 try (// 3.创建DatagramSocket对象
                      //这里是不需要加端口的（?）
-                     DatagramSocket socket = new DatagramSocket(serverInfo.heartbeatingPort)) {
+                     DatagramSocket socket = new DatagramSocket(baseInfo.heartBeatingPort)) {
                     // 4.向服务器端发送数据报
                     //socket.send(packet);
                     // System.out.print(LocalTime.now());
                     // System.out.println("向"+portToCheck+"发送心跳");
-                    send(socket, packet, serverInfo.loss);
+                    send(socket, packet, baseInfo.loss);
                     /*
                      * 接收服务器端响应的数据
                      * 创建计时器
@@ -480,7 +479,7 @@ public class Daemon {
                     //socket.send(packet2);
                     // System.out.print(LocalTime.now());
                     // System.out.println("向"+address+"发送回复 ");
-                    send(socket, packet2, serverInfo.loss);
+                    send(socket, packet2, baseInfo.loss);
                     // System.out.println("回复： 还在");
                     // 4.关闭资源
                     // socket在try的（）中声明，退出try后会自动close。

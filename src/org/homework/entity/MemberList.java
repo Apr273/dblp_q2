@@ -5,7 +5,7 @@ import java.util.ArrayList;
 /**
  * 组成员列表实体类
  */
-public class GroupMemberList {
+public class MemberList {
     public static ArrayList<MemberInfo> members=new ArrayList<>();
 
     public class MemberInfo{
@@ -29,7 +29,7 @@ public class GroupMemberList {
     /**
      * 返回字符串形式的组成员列表
      */
-    public String members_toString(){
+    public String membersToString(){
         StringBuilder sb = new StringBuilder();
         for (MemberInfo member:members){
             sb.append(member.timestamp).append(" ").append(member.port).append("\n");
@@ -41,14 +41,14 @@ public class GroupMemberList {
      * 添加组成员
      */
     public void memberAdd(String timestamp, Integer port){
-        MemberInfo newmember=new MemberInfo(timestamp, port);
+        MemberInfo newMember=new MemberInfo(timestamp, port);
         for(int i=0;i<members.size();i++){
             if(members.get(i).port.equals(port)){
                 members.get(i).timestamp=timestamp;//已存在则更新时间戳
                 return;
             }
         }
-        members.add(newmember);
+        members.add(newMember);
     }
 
     /**

@@ -7,7 +7,7 @@ import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class CommonServer {
+public class NodeServer {
 
     public static Daemon daemon;
 
@@ -54,7 +54,6 @@ public class CommonServer {
                     System.out.println("该节点未成功加入！");
                     daemon.joinGroup();
                 }
-
             }
 
             else if (words[0].equals("exit")) {
